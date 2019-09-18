@@ -1,4 +1,4 @@
-# Raspberry Pi SDCARD Creator
+# Raspberry Pi k3s Setup
 
 As I tried to get a bunch of sd cards made for a Raspberry Pi Kubernetes cluster, I found it frustrating to have to create cards manually. I normally use balena for provisioning raspberry pis, but ran into problems trying to get utilities like systemd working, etc.
 
@@ -8,13 +8,6 @@ As I tried to get a bunch of sd cards made for a Raspberry Pi Kubernetes cluster
 - [x] Get K3s running on one node of rpi cluster
 
 TODO: create a runonce.sh and runalways.sh, use systemd to look for these and run. Or whatever run-parts.sh is.
-
-Some systemd resources:
-- https://learn.adafruit.com/running-programs-automatically-on-your-tiny-computer/systemd-writing-and-enabling-a-service
-- https://www.dexterindustries.com/howto/run-a-program-on-your-raspberry-pi-at-startup/
-
-Golang shell commands:
-- https://nathanleclaire.com/blog/2014/12/29/shelled-out-commands-in-golang/
 
 > Question: How does Balena etcher write .img files to sd card? How does etcher make it easy to select the correct drive?
 
@@ -135,16 +128,56 @@ Now unmount the root partition, insert into Pi, and power up.
 Reboot.
 
 ### Installing k3s
-#### Bootstrap the k3s server
 
+Installing k3s on Raspberry Pi is straightforward once the base images are configured correctly. This involves setup of the master node, adding agent nodes, adding a load balancer to make services available outside the cluster, and adding some storage for cluster use.
+
+#### Setup the Master Node
+
+```
 curl -sfL https://get.k3s.io | sh -
+```
 
+And to verify status:
+
+```
 sudo systemctl status k3s
+```
 
+You should see ...
+
+
+
+
+
+To setup agent nodes, you need to get the node token so the agents know how to join the cluster.
+
+```
 sudo cat /var/lib/rancher/k3s/server/node-token
+```
 
+Copy this and save it for later use.
+
+#### Setup the Agent Nodes
+
+On each node, run
+
+```
+curl -sfL https://get.k3s.io | K3S_TOKEN=<token_from_master_node> K3S_URL=https://<master_ip>:6443 sh -
+```
+
+And to verify status:
+
+```
+kubectl get nodes
+```
+
+#### Add Load Balancer
+
+#### Add Storage
 
 ### Resources
+
+https://blog.boogiesoftware.com/2019/03/building-light-weight-kubernetes.html
 
 Some systemd resources:
 - https://learn.adafruit.com/running-programs-automatically-on-your-tiny-computer/systemd-writing-and-enabling-a-service
