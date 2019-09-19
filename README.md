@@ -145,8 +145,31 @@ sudo systemctl status k3s
 
 You should see ...
 
-
-
+```
+● k3s.service - Lightweight Kubernetes
+   Loaded: loaded (/etc/systemd/system/k3s.service; enabled; vendor preset: enab
+   Active: active (running) since Tue 2019-09-17 17:29:48 BST; 1 day 7h ago
+     Docs: https://k3s.io
+  Process: 529 ExecStartPre=/sbin/modprobe br_netfilter (code=exited, status=0/S
+  Process: 530 ExecStartPre=/sbin/modprobe overlay (code=exited, status=0/SUCCES
+ Main PID: 531 (k3s-server)
+    Tasks: 103
+   Memory: 101.6M
+   CGroup: /system.slice/k3s.service
+           ├─ 531 /usr/local/bin/k3s server KillMode=process
+           ├─ 565 containerd -c /var/lib/rancher/k3s/agent/etc/containerd/config
+           ├─1168 containerd-shim -namespace k8s.io -workdir /var/lib/rancher/k3
+           ├─1215 containerd-shim -namespace k8s.io -workdir /var/lib/rancher/k3
+           ├─1220 containerd-shim -namespace k8s.io -workdir /var/lib/rancher/k3
+           ├─1264 /pause
+           ├─1270 /pause
+           ├─1276 /pause
+           ├─1358 containerd-shim -namespace k8s.io -workdir /var/lib/rancher/k3
+           ├─1376 /coredns -conf /etc/coredns/Corefile
+           ├─1381 containerd-shim -namespace k8s.io -workdir /var/lib/rancher/k3
+           ├─1399 /traefik --configfile=/config/traefik.toml
+           ├─1405 containerd-shim -namespace k8s.io -workdir /var/lib/rancher/k3
+```
 
 
 To setup agent nodes, you need to get the node token so the agents know how to join the cluster.
@@ -165,15 +188,82 @@ On each node, run
 curl -sfL https://get.k3s.io | K3S_TOKEN=<token_from_master_node> K3S_URL=https://<master_ip>:6443 sh -
 ```
 
-And to verify status:
+And to verify status, run the following on the master node:
 
 ```
-kubectl get nodes
+sudo kubectl get nodes
 ```
+
+And you should see something like:
+
+```
+pi@rpi-k3s-1:~ $ sudo kubectl get nodes
+NAME        STATUS   ROLES    AGE   VERSION
+rpi-k3s-1   Ready    master   44h   v1.14.6-k3s.1
+rpi-k3s-2   Ready    worker   31h   v1.14.6-k3s.1
+```
+
+If you don't use sudo here, at least in the way I've set things up, you get ...
+
+```
+WARN[2019-09-19T01:19:46.569593016+01:00] Unable to read /etc/rancher/k3s/k3s.yaml, please start server with --write-kubeconfig-mode to modify kube config permissions 
+error: Error loading config file "/etc/rancher/k3s/k3s.yaml": open /etc/rancher/k3s/k3s.yaml: permission denied
+```
+
+Repeating this process for each RPi, I was able to get the 5-node cluster set up. One node would not show up, but rebooting solved that problem.
+
+#### Setup remote kubectl
+
+You can ssh into the master or nodes to do various things, but that's a hassle. Better to install kubectl on your local machine, and copy the cluster information from the master node into the local kubeconfig file.
+
+To install kubectl, refer to this page: https://kubernetes.io/docs/tasks/tools/install-kubectl/.
+
+I was able to use the following to successfully install kubectl on my linux box, for example:
+
+```
+curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+kubectl version
+```
+
+kubectl version will give show you some client information, but it will end with an error of sorts, because there is no cluster configuration file available: 
+
+```
+The connection to the server <server-name:port> was refused - did you specify the right host or port?
+```
+
+To setup kubectl locally to connect to your pi cluster, you will need to grab the contents of the config from the master, and place it in a file named config on your local machine.
+
+The file you need from your master node: ```/etc/rancher/k3s/k3s.yaml```
+
+The place to put it on local machine: ```~/.kube/config``` (filename is config with no extension)
+
+That file will have localhost:6443 specified as the server. Change that entry to reflect the hostname of your master, and you should be able to run kubectl locally and get 
+
+```
+mxa@mxa-dev-linux:~/.kube$ kubectl version
+Client Version: version.Info{Major:"1", Minor:"16", GitVersion:"v1.16.0", GitCommit:"2bd9643cee5b3b3a5ecbd3af49d09018f0773c77", GitTreeState:"clean", BuildDate:"2019-09-18T14:36:53Z", GoVersion:"go1.12.9", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"14", GitVersion:"v1.14.6-k3s.1", GitCommit:"4cd85f14854d942e9016cc15f399785c103242e9", GitTreeState:"clean", BuildDate:"2019-08-19T16:12+00:00Z", GoVersion:"go1.12.9", Compiler:"gc", Platform:"linux/arm"}
+```
+
+If you want to add shell autocompletion and all that, check out this: https://kubernetes.io/docs/tasks/tools/install-kubectl/#optional-kubectl-configurations.
+
+#### Install Kubernetes Dashboard (optional)
+
+Once kubectl is set up on your local machine, you can add the dashboard to the cluster:
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta4/aio/deploy/recommended.yaml
 
 #### Add Load Balancer
 
+
 #### Add Storage
+
+I happen to have a NAS at home, so decided to configure storage to use that.
+
+#### Cross-build container images for ARM
+
 
 ### Resources
 
